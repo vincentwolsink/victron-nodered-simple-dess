@@ -146,6 +146,8 @@ In a two-day simulation this came to about **13 settings-file saves per day**, m
 
 ## Schedule viewer
 
+<img width="1043" height="612" alt="dess_schedule" src="https://github.com/user-attachments/assets/39230276-2fb4-463b-b8fe-a94e4a3cf6d1" />
+
 Group **7 — Schedule viewer** serves a read-only page with the current plan. Open it at the same address as the Node-RED editor, with `/dess` appended (e.g. `https://venus.local:1881/dess`; if `httpNodeRoot` is set in `settings.js`, it goes in front of `/dess`).
 
 - A bar chart of the price per hour, coloured by mode (charge / self-consume / hold), with the self-consume threshold as a dashed line, day separators and a "now" marker. Hover over an hour for its details.
