@@ -149,6 +149,8 @@ In a two-day simulation with real prices, an hourly run without new prices wrote
 
 ## Schedule viewer
 
+<img width="1043" height="612" alt="dess_schedule" src="https://github.com/user-attachments/assets/39230276-2fb4-463b-b8fe-a94e4a3cf6d1" />
+
 Group **7 — Schedule viewer** serves a read-only page with the current plan. Open it at the same address as the Node-RED editor, with `/dess` appended (e.g. `https://venus.local:1881/dess`; if `httpNodeRoot` is set in `settings.js`, it goes in front of `/dess`).
 
 - A bar chart of the price per hour or quarter, coloured by mode (charge / self-consume / hold), with the self-consume threshold as a dashed line, day separators and a "now" marker. Hover over a bar for its details.
