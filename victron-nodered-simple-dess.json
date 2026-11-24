@@ -597,7 +597,7 @@
       }
     ],
     "repeat": "",
-    "crontab": "0 * * * *",
+    "crontab": "0 0-23 * * *",
     "once": false,
     "onceDelay": 0.1,
     "topic": "rolling",
