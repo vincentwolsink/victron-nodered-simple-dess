@@ -1,0 +1,936 @@
+[
+  {
+    "id": "1bff9db5d5d24e43",
+    "type": "tab",
+    "label": "Simple Self-consumption DESS",
+    "disabled": false,
+    "info": ""
+  },
+  {
+    "id": "262e0413cde94134",
+    "type": "function",
+    "name": "Edit me: site configuration (On Start tab)",
+    "func": "// Nothing to edit here: the settings are on the \"On Start\" tab of this node.\n// This only re-applies them (used by the \"Reload config\" button).\nconst cfg = context.get('cfg');\nif (!cfg) {\n    node.error('No configuration found; deploy the flow first.');\n    return null;\n}\nflow.set('cheapestHourDessConfig', cfg);\nnode.status({ fill: 'blue', shape: 'dot', text: 'config reloaded' });\nreturn null;",
+    "outputs": 0,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "// =====================================================================\n//  EDIT THIS BLOCK (this \"On Start\" tab), THEN DEPLOY.\n//  It runs on every deploy / restart.\n// =====================================================================\nconst cfg = {\n    // Charge window\n    chargeHours: 3,                 // length of the charge window (hours it takes to fill the battery)\n    targetSoc: 100,                 // SOC to charge to in the charge window\n    priceProperty: 'all_in_with_vat', // EnergyZero price array to use\n    refreshFromHour: 15,            // local hour from which tomorrow's prices are fetched\n\n    // After the charge window: self-consume when price > charge price / roundTripEfficiency + b_cycle_cost,\n    // otherwise hold the battery (no discharge, house on grid)\n    b_cycle_cost: 0.01,             // battery cost per kWh cycled (EUR/kWh)\n    roundTripEfficiency: 1,         // e.g. 0.85 to include charge/discharge losses\n    minSoc: 10,                     // shown as target in self-consume hours (the GX ignores it there);\n                                    //   set to your ESS minimum SOC so the plan graph is realistic\n\n    // Battery, also written to the GX (Dynamic ESS settings)\n    b_max: 10,                      // usable battery capacity (kWh)\n    tb_max: 5,                      // max battery CHARGE power (kW): charge rate in the charge window\n    fb_max: 5,                      // max battery DISCHARGE power (kW)\n    feed_in_possible: true,         // allow solar feed-in to the grid (AllowGridFeedIn)\n\n    // GX schedule slots\n    scheduleSlots: 48,              // 48 on current Venus OS, 4 on older versions\n    writeTargetSoc: true            // also write Schedule/N/TargetSoc (current Venus OS); false on older versions\n};\ncontext.set('cfg', cfg);\nflow.set('cheapestHourDessConfig', cfg);\nnode.status({ fill: 'blue', shape: 'dot', text: 'config loaded' });",
+    "finalize": "",
+    "libs": [],
+    "x": 480,
+    "y": 140,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "22a32cac72ca4935"
+  },
+  {
+    "id": "da237753e38e4fba",
+    "type": "inject",
+    "name": "Reload config",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": "",
+    "payloadType": "str",
+    "x": 160,
+    "y": 140,
+    "wires": [
+      [
+        "262e0413cde94134"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "22a32cac72ca4935"
+  },
+  {
+    "id": "8434df7eefe44884",
+    "type": "comment",
+    "name": "START HERE",
+    "info": "1) Open \"Edit me: site configuration (On Start tab)\", go to its **On Start** tab and set the charge window, battery cost and battery values.\n2) Deploy. The configuration is applied on every deploy.\n3) After checking the \"Rules plan (per hour)\" debug output, click \"Set DESS mode = 4 (Node-RED)\" once.",
+    "x": 150,
+    "y": 80,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "22a32cac72ca4935"
+  },
+  {
+    "id": "22a32cac72ca4935",
+    "type": "group",
+    "z": "1bff9db5d5d24e43",
+    "name": "1 \u2014 Configuration (edit me)",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "262e0413cde94134",
+      "da237753e38e4fba",
+      "8434df7eefe44884"
+    ],
+    "x": 48,
+    "y": 20,
+    "w": 644,
+    "h": 160
+  },
+  {
+    "id": "0f7a6f6b60a84f0d",
+    "type": "inject",
+    "name": "Force price refresh",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "refresh",
+    "payload": "",
+    "payloadType": "date",
+    "x": 180,
+    "y": 450,
+    "wires": [
+      [
+        "e66c8d98dcfe4ef1"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "c7a7666febcb476b"
+  },
+  {
+    "id": "68af64fc3a084866",
+    "type": "inject",
+    "name": "Run now (test)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "manual",
+    "payload": "",
+    "payloadType": "date",
+    "x": 160,
+    "y": 390,
+    "wires": [
+      [
+        "e66c8d98dcfe4ef1"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "c7a7666febcb476b"
+  },
+  {
+    "id": "f9ecadec7c0848ea",
+    "type": "comment",
+    "name": "Timing",
+    "info": "Every hour (at :00): plan from the cached prices and write the changes to the GX (usually none).\nFrom 15:00 (refreshFromHour) the same run fetches tomorrow's EnergyZero prices once, retrying every hour until they are published. Today's prices are fetched when the current hour has no price (e.g. after a restart).\n\"Force price refresh\" refetches tomorrow's prices immediately.\nSet the GX timezone to Europe/Amsterdam.",
+    "x": 130,
+    "y": 270,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "c7a7666febcb476b"
+  },
+  {
+    "id": "c7a7666febcb476b",
+    "type": "group",
+    "z": "1bff9db5d5d24e43",
+    "name": "2 \u2014 Trigger",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "0f7a6f6b60a84f0d",
+      "68af64fc3a084866",
+      "f9ecadec7c0848ea",
+      "e3b45ecb85dd4c1f",
+      "e66c8d98dcfe4ef1",
+      "731915f70e0546ba",
+      "8c3e1f2a9b7d4e60"
+    ],
+    "x": 48,
+    "y": 210,
+    "w": 654,
+    "h": 280
+  },
+  {
+    "id": "fabc9f96e6a54c40",
+    "type": "function",
+    "name": "Build EnergyZero URL",
+    "func": "// msg.priceDate (YYYY-MM-DD, local) is set by \"Load cached cheapest hour\".\nconst [y, m, d] = String(msg.priceDate || '').split('-');\nif (!y || !m || !d) {\n    node.error('No priceDate on message');\n    return null;\n}\nconst dateParam = d + '-' + m + '-' + y;\nmsg.url = 'https://public.api.energyzero.nl/public/v1/prices?energyType=ENERGY_TYPE_ELECTRICITY&date='\n        + dateParam + '&interval=INTERVAL_HOUR';\nnode.status({ fill: 'blue', shape: 'dot', text: 'EnergyZero ' + dateParam });\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 280,
+    "y": 640,
+    "wires": [
+      [
+        "019271c575d94e94"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "196d9d93f2f644d6"
+  },
+  {
+    "id": "019271c575d94e94",
+    "type": "http request",
+    "name": "Fetch EnergyZero prices",
+    "method": "GET",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "authType": "",
+    "x": 570,
+    "y": 640,
+    "wires": [
+      [
+        "f9aba457925740d8"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "196d9d93f2f644d6"
+  },
+  {
+    "id": "b913ebd6a70a4a67",
+    "type": "comment",
+    "name": "Prices & cheapest hour",
+    "info": "Public EnergyZero endpoint, no API key. Uses priceProperty (default all_in_with_vat, consumer all-in price incl. VAT).\nStores all hourly prices (the response holds two days) and picks tomorrow's cheapest block of chargeHours consecutive hours (lowest average price, ties go to the earliest).\nCharge windows are stored per date in flow context (cheapestHourDessTargets); ended windows are kept 48 h as price reference.\nIf prices are not available yet, the cached plan is used unchanged.",
+    "x": 180,
+    "y": 580,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "196d9d93f2f644d6"
+  },
+  {
+    "id": "196d9d93f2f644d6",
+    "type": "group",
+    "z": "1bff9db5d5d24e43",
+    "name": "3 \u2014 EnergyZero prices & charge window",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "fabc9f96e6a54c40",
+      "019271c575d94e94",
+      "b913ebd6a70a4a67",
+      "f9aba457925740d8",
+      "ffe300d9710c4c97",
+      "37a14ff605b84360",
+      "5d2ad0d7b17b4076",
+      "0a809bc2bc0347f1"
+    ],
+    "x": 48,
+    "y": 520,
+    "w": 1504,
+    "h": 220
+  },
+  {
+    "id": "f9aba457925740d8",
+    "type": "function",
+    "name": "Find cheapest charge window (Europe/Amsterdam)",
+    "func": "const TZ = 'Europe/Amsterdam';\nconst ymdFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });\nconst hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' });\nfunction localParts(d) {\n    return Object.fromEntries(ymdFmt.formatToParts(d).filter(x => x.type !== 'literal').map(x => [x.type, x.value]));\n}\nfunction localYmd(d) {\n    const p = localParts(d);\n    return p.year + '-' + p.month + '-' + p.day;\n}\n// Calendar-day arithmetic on the local date (DST-safe, unlike now + 24h).\nfunction localYmdPlusDays(d, days) {\n    const p = localParts(d);\n    const t = new Date(Date.UTC(+p.year, +p.month - 1, +p.day + days));\n    return t.getUTCFullYear() + '-' + String(t.getUTCMonth() + 1).padStart(2, '0') + '-' + String(t.getUTCDate()).padStart(2, '0');\n}\nfunction localHour(d) {\n    return parseInt(hourFmt.format(d), 10);\n}\n// Drop targets whose hour has ended; return { targets, active } where active is the earliest remaining.\n// Ended windows are kept for 48 h: the rules planner uses their price as\n// \"what the energy in the battery cost\".\nfunction activeTarget(targets, nowMs) {\n    const kept = {};\n    let active = null;\n    for (const [date, t] of Object.entries(targets || {})) {\n        if (!t || !Number.isInteger(t.hour) || !t.end) continue;\n        const end = Date.parse(t.end);\n        if (end <= nowMs - 48 * 3600 * 1000) continue;\n        kept[date] = t;\n        if (end > nowMs && (!active || Date.parse(t.start) < Date.parse(active.start))) active = t;\n    }\n    return { targets: kept, active };\n}\n\n// Never stops the flow: if prices are missing, msg.found is null and the\n// next node continues with whatever goal is already cached.\nconst cfg = msg.config || flow.get('cheapestHourDessConfig') || {};\nconst key = cfg.priceProperty || 'all_in_with_vat';\nconst rows = msg.payload && msg.payload[key];\nmsg.found = null;\nif (!Array.isArray(rows)) {\n    const why = msg.payload && msg.payload.message ? ': ' + msg.payload.message : '';\n    node.warn('EnergyZero has no \"' + key + '\" prices for ' + msg.priceDate + ' yet (HTTP ' + msg.statusCode + why + '). Keeping the cached plan; will retry at the next hourly run.');\n    node.status({ fill: 'yellow', shape: 'ring', text: 'no prices for ' + msg.priceDate });\n    return msg;\n}\n// Keep all hourly prices (the response holds two days) for the rules planner.\nconst priceStore = Object.assign({}, flow.get('cheapestHourDessPrices') || {});\nfor (const row of rows) {\n    const t = row && Date.parse(row.start);\n    const v = row && row.price ? Number(row.price.value) : NaN;\n    if (Number.isFinite(t) && Number.isFinite(v)) priceStore[String(t)] = v;\n}\nfor (const k of Object.keys(priceStore)) if (Number(k) < Date.now() - 3 * 86400000) delete priceStore[k];\nflow.set('cheapestHourDessPrices', priceStore);\nconst candidates = [];\nfor (const row of rows) {\n    if (!row || !row.start || !row.price || row.price.value === undefined || row.price.value === null) continue;\n    const dt = new Date(row.start);\n    if (Number.isNaN(dt.getTime())) continue;\n    if (localYmd(dt) !== msg.priceDate) continue;   // response also contains the previous day\n    const price = Number(row.price.value);\n    if (!Number.isFinite(price)) continue;\n    candidates.push({ start: row.start, end: row.end, price: price, hour: localHour(dt) });\n}\nif (!candidates.length) {\n    node.warn('No EnergyZero prices found for ' + msg.priceDate + '. Keeping the cached plan; will retry at the next hourly run.');\n    node.status({ fill: 'yellow', shape: 'ring', text: 'no prices for ' + msg.priceDate });\n    return msg;\n}\n// Cheapest block of chargeHours consecutive hours (lowest average price, ties\n// go to the earliest). The goal is set at the END of the block, so the API\n// plans a full battery when the cheap block ends and charges during it.\nconst hours = Number.isInteger(cfg.chargeHours) && cfg.chargeHours >= 1 ? cfg.chargeHours : 3;\ncandidates.sort((a, b) => Date.parse(a.start) - Date.parse(b.start));\nlet best = null;\nfor (let i = 0; i + hours <= candidates.length; i++) {\n    const block = candidates.slice(i, i + hours);\n    let contiguous = true;\n    for (let k = 1; k < block.length; k++) {\n        if (Date.parse(block[k].start) - Date.parse(block[k - 1].start) !== 3600000) contiguous = false;\n    }\n    if (!contiguous) continue;\n    const avg = block.reduce((s, c) => s + c.price, 0) / block.length;\n    if (!best || avg < best.price - 1e-12) {\n        const last = block[block.length - 1];\n        const endHour = localHour(new Date(Date.parse(last.start) + 3600000));\n        best = { hour: block[0].hour, goalHour: endHour, hours: hours, price: avg, start: block[0].start, end: last.end };\n    }\n}\nif (!best) {\n    node.warn('No ' + hours + ' consecutive hours with prices for ' + msg.priceDate + '. Keeping the cached plan.');\n    node.status({ fill: 'yellow', shape: 'ring', text: 'no ' + hours + 'h window for ' + msg.priceDate });\n    return msg;\n}\nmsg.found = Object.assign({ date: msg.priceDate }, best);\nconst hh = h => String(h).padStart(2, '0') + ':00';\nnode.status({ fill: 'green', shape: 'dot', text: msg.priceDate + ' ' + hh(best.hour) + '-' + hh(best.goalHour) + ' avg ' + best.price.toFixed(4) });\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 910,
+    "y": 640,
+    "wires": [
+      [
+        "5d2ad0d7b17b4076",
+        "ffe300d9710c4c97"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "196d9d93f2f644d6"
+  },
+  {
+    "id": "ffe300d9710c4c97",
+    "type": "debug",
+    "name": "Selected charge window",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 1240,
+    "y": 700,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "196d9d93f2f644d6"
+  },
+  {
+    "id": "c1ff51df919849e3",
+    "type": "comment",
+    "name": "Rules",
+    "info": "One slot per hour, from now until the last known price:\n- charge: inside the cheapest charge window -> TargetSoc = targetSoc, Strategy 2: charge from grid at up to tb_max.\n- self-consume: price > charge price / roundTripEfficiency + b_cycle_cost -> Strategy 1 + no battery->grid: battery follows live consumption. TargetSoc = minSoc (ignored by the GX, only for the plan graph).\n- hold: otherwise -> TargetSoc 100, Strategy 2 + no grid->battery: battery does not discharge, grid covers loads, solar may charge. The 100% is required: a lower target would make the GX discharge towards it.\nCharge price = average price of the last charge window (before the first one: the upcoming window).",
+    "x": 170,
+    "y": 830,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "5e76815cd26147e7"
+  },
+  {
+    "id": "5e76815cd26147e7",
+    "type": "group",
+    "z": "1bff9db5d5d24e43",
+    "name": "4 \u2014 Rules planner",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "c1ff51df919849e3",
+      "0aa04a518fc647ac",
+      "4b9d2c7e1f3a5d80",
+      "7e2b9c4d1a6f3e58",
+      "3f8a1c6e9b2d4a70"
+    ],
+    "x": 48,
+    "y": 770,
+    "w": 574,
+    "h": 220
+  },
+  {
+    "id": "24eb670ca3ff47cf",
+    "type": "function",
+    "name": "Map plan to dbus writes",
+    "func": "// Input: msg.slots = [{ mode, Start, Duration, TargetSoc, AllowGridFeedIn, Restrictions, Strategy }, ...]\n// from the Rules planner.\n//\n// The GX (venus-dynamicess) has 48 schedule slots and uses whichever slot's\n// Start/Duration contains \"now\" (slot order does not matter). Each period always\n// lands in slot (period number % slots), so a slot keeps its period until that\n// period has passed, and only values that changed are rewritten.\nconst cfg = msg.config || flow.get('cheapestHourDessConfig') || {};\nconst SLOTS = Number.isInteger(cfg.scheduleSlots) && cfg.scheduleSlots > 0 ? cfg.scheduleSlots : 48;\nconst WRITE_TARGETSOC = cfg.writeTargetSoc !== false;\nconst FULL_REWRITE_MS = 6 * 3600 * 1000;   // periodically re-send everything (unchanged values are no-ops on the GX)\n\nif (!Array.isArray(msg.slots) || !msg.slots.length) {\n    node.error('No planned slots on the message');\n    return null;\n}\nconst entries = msg.slots.slice(0, SLOTS).map(e => ({\n    mode: e.mode,\n    Start: e.Start, Duration: e.Duration,\n    Soc: Math.round(e.TargetSoc), TargetSoc: e.TargetSoc,\n    AllowGridFeedIn: e.AllowGridFeedIn, Restrictions: e.Restrictions, Strategy: e.Strategy, Flags: 0\n}));\nconst desired = {};\nfor (const e of entries) desired[Math.round(e.Start / e.Duration) % SLOTS] = e;\n\n// Diff against what was written before. After a (re)deploy or restart the\n// cache is empty, so everything is written once, which also clears stale\n// slots (e.g. left by VRM Auto mode).\nconst EMPTY = { Start: 0, Duration: 0, Soc: 0, TargetSoc: 0, AllowGridFeedIn: 0, Restrictions: 0, Strategy: 0, Flags: 0 };\nconst FIELDS = ['Start', 'Soc'].concat(WRITE_TARGETSOC ? ['TargetSoc'] : [], ['AllowGridFeedIn', 'Restrictions', 'Strategy', 'Flags']);\nconst cacheKey = SLOTS + '/' + WRITE_TARGETSOC;\nlet written = context.get('written');\nif (!written || context.get('writtenKey') !== cacheKey) {\n    written = {};\n    context.set('writtenKey', cacheKey);\n    context.set('lastFull', 0);\n}\nconst full = Date.now() - (context.get('lastFull') || 0) > FULL_REWRITE_MS;\n\nconst writes = [];\n// Battery settings the GX uses to turn a slot's target SOC into a charge rate\n// (charge rate = capacity x SOC difference / time left, capped by the limit).\n// Victron's own Node-RED example writes BatteryCapacity from b_max as well.\nconst settingsDesired = {};\nconst kw = v => Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null;\nif (kw(cfg.b_max) !== null) settingsDesired['/Settings/DynamicEss/BatteryCapacity'] = kw(cfg.b_max);\nif (kw(cfg.tb_max) !== null) settingsDesired['/Settings/DynamicEss/BatteryChargeLimit'] = kw(cfg.tb_max);\nif (kw(cfg.fb_max) !== null) settingsDesired['/Settings/DynamicEss/BatteryDischargeLimit'] = kw(cfg.fb_max);\nconst prevSettings = written.settings || {};\nfor (const [p, v] of Object.entries(settingsDesired)) {\n    if (full || prevSettings[p] !== v) writes.push({ topic: p.split('/').pop(), path: p, payload: v });\n}\nwritten.settings = settingsDesired;\n\n// Flash wear: the GX (localsettings) ignores writes of an unchanged value and\n// saves the settings file at most once per 2 s burst of changes. So we only\n// send values that differ, never touch slots whose period has already ended\n// (the GX ignores them), and disable a slot with a single Duration=0 write.\nconst nowSec = Date.now() / 1000;\nconst live = w => !!w && w.Duration > 0 && w.Start + w.Duration > nowSec;   // current or future period\nconst NON_TIMING = FIELDS.filter(f => f !== 'Start');\nlet changedSlots = 0;\nfor (let slot = 0; slot < SLOTS; slot++) {\n    const e = desired[slot];\n    const prev = written[slot];                 // undefined = unknown content (after deploy/restart)\n    const base = '/Settings/DynamicEss/Schedule/' + slot + '/';\n    const push = (name, value) => writes.push({ topic: 'slot ' + slot + ' ' + name, path: base + name, payload: value });\n    const before = writes.length;\n    if (!e) {\n        // Nothing planned here. Disable it only if it could still be used\n        // (unknown content, or a current/future period); ended slots stay as they are.\n        if (!prev || live(prev) || (full && prev.Duration !== 0)) {\n            push('Duration', 0);\n            written[slot] = Object.assign({}, prev || EMPTY, { Duration: 0 });\n        }\n    } else if (!prev || prev.Start !== e.Start || prev.Duration !== e.Duration) {\n        // New period for this slot. If the slot may still be in use, disable it\n        // first so the GX never acts on a mix of old and new values. Otherwise\n        // (ended or disabled) write the fields first and Start/Duration last.\n        const disable = !prev || live(prev);\n        if (disable) push('Duration', 0);\n        for (const f of NON_TIMING) if (!prev || full || prev[f] !== e[f]) push(f, e[f]);\n        push('Start', e.Start);\n        push('Duration', e.Duration);\n        written[slot] = Object.assign({}, e);\n    } else {\n        // Same period, re-planned values: write only what changed (or all on a full rewrite).\n        for (const f of FIELDS) if (full || prev[f] !== e[f]) push(f, e[f]);\n        if (full) push('Duration', e.Duration);\n        written[slot] = Object.assign({}, e);\n    }\n    if (writes.length > before) changedSlots++;\n}\ncontext.set('written', written);\nif (full) context.set('lastFull', Date.now());\n\nconst last = entries[entries.length - 1];\nconst until = new Date((last.Start + last.Duration) * 1000);\nconst hm = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });\nconst cur = entries[0];\nnode.status({\n    fill: 'green', shape: 'dot',\n    text: 'now ' + (cur.mode || 'strategy ' + cur.Strategy) + ', ' + entries.length + ' slots until ' + hm.format(until)\n        + ' / ' + writes.length + ' writes in ' + changedSlots + ' slots' + (full ? ' (full)' : '')\n});\n// One message per dbus write: the output node needs a single number in msg.payload.\nreturn [writes];",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 310,
+    "y": 1140,
+    "wires": [
+      [
+        "ca67d6ce825648d6"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "d127c683f880458a"
+  },
+  {
+    "id": "ca67d6ce825648d6",
+    "type": "delay",
+    "name": "Rate-limit dbus writes (20/sec)",
+    "pauseType": "rate",
+    "timeout": "5",
+    "timeoutUnits": "seconds",
+    "rate": "20",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "outputs": 1,
+    "x": 640,
+    "y": 1140,
+    "wires": [
+      [
+        "5d92c0fda10944b6",
+        "5b2eaa8f461c4882"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "d127c683f880458a"
+  },
+  {
+    "id": "5d92c0fda10944b6",
+    "type": "victron-output-custom",
+    "service": "com.victronenergy.settings",
+    "path": "/Settings/DynamicEss/Schedule/0/Soc",
+    "serviceObj": {
+      "service": "com.victronenergy.settings",
+      "name": "com.victronenergy.settings"
+    },
+    "pathObj": {
+      "path": "/Settings/DynamicEss/Schedule/0/Soc",
+      "name": "/Settings/DynamicEss/Schedule/0/Soc",
+      "type": "number",
+      "value": 0
+    },
+    "name": "Write schedule slot (msg.path override)",
+    "onlyChanges": false,
+    "x": 1000,
+    "y": 1140,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "d127c683f880458a"
+  },
+  {
+    "id": "5b2eaa8f461c4882",
+    "type": "debug",
+    "name": "Schedule writes",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 920,
+    "y": 1200,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "d127c683f880458a"
+  },
+  {
+    "id": "4d71e3c8cf694fd5",
+    "type": "comment",
+    "name": "Write to GX",
+    "info": "Writes the plan into the GX schedule slots (period % slots). Only changed values are sent; ended slots are left alone; unused slots are disabled with Duration=0. Everything is re-sent after deploy/restart and every 6 h (unchanged values are no-ops on the GX).\nAlso keeps /Settings/DynamicEss/BatteryCapacity (b_max), BatteryChargeLimit (tb_max) and BatteryDischargeLimit (fb_max) in line with the config.\nThe path is taken from msg.path; the node's own path is only a type template.",
+    "x": 150,
+    "y": 1080,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "d127c683f880458a"
+  },
+  {
+    "id": "d127c683f880458a",
+    "type": "group",
+    "z": "1bff9db5d5d24e43",
+    "name": "5 \u2014 Write schedule to GX",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "24eb670ca3ff47cf",
+      "ca67d6ce825648d6",
+      "5d92c0fda10944b6",
+      "5b2eaa8f461c4882",
+      "4d71e3c8cf694fd5",
+      "d6a1e8b3c4f29071"
+    ],
+    "x": 48,
+    "y": 1020,
+    "w": 1154,
+    "h": 220
+  },
+  {
+    "id": "0e409415c4fb4917",
+    "type": "inject",
+    "name": "Set DESS mode = 4 (Node-RED)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": 4,
+    "payloadType": "num",
+    "x": 210,
+    "y": 1390,
+    "wires": [
+      [
+        "4e7dbb16524d476e",
+        "417ed956eecf401b"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "64d17ad314cb4e7c"
+  },
+  {
+    "id": "78327adfa02642dd",
+    "type": "inject",
+    "name": "Revert DESS mode = 1 (VRM Auto)",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "",
+    "payload": 1,
+    "payloadType": "num",
+    "x": 220,
+    "y": 1450,
+    "wires": [
+      [
+        "4e7dbb16524d476e",
+        "417ed956eecf401b"
+      ]
+    ],
+    "z": "1bff9db5d5d24e43",
+    "g": "64d17ad314cb4e7c"
+  },
+  {
+    "id": "4e7dbb16524d476e",
+    "type": "victron-output-custom",
+    "service": "com.victronenergy.settings",
+    "path": "/Settings/DynamicEss/Mode",
+    "serviceObj": {
+      "service": "com.victronenergy.settings",
+      "name": "com.victronenergy.settings"
+    },
+    "pathObj": {
+      "path": "/Settings/DynamicEss/Mode",
+      "name": "/Settings/DynamicEss/Mode",
+      "type": "enum",
+      "value": 0,
+      "enum": {
+        "0": "Off",
+        "1": "Auto",
+        "4": "Node-RED"
+      }
+    },
+    "name": "Set DynamicEss/Mode",
+    "onlyChanges": false,
+    "x": 520,
+    "y": 1390,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "64d17ad314cb4e7c"
+  },
+  {
+    "id": "417ed956eecf401b",
+    "type": "debug",
+    "name": "Mode write (check node status)",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 550,
+    "y": 1450,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "64d17ad314cb4e7c"
+  },
+  {
+    "id": "3d1f4de194854b9c",
+    "type": "comment",
+    "name": "ONE-TIME after import",
+    "info": "Click \"Set DESS mode = 4 (Node-RED)\" once after importing and verifying a test run.\nUse \"Revert DESS mode = 1 (VRM Auto)\" if you want to stop using this flow.\nDo not leave mode 4 active if this flow is disabled.",
+    "x": 190,
+    "y": 1330,
+    "wires": [],
+    "z": "1bff9db5d5d24e43",
+    "g": "64d17ad314cb4e7c"
+  },
+  {
+    "id": "64d17ad314cb4e7c",
+    "type": "group",
+    "z": "1bff9db5d5d24e43",
+    "name": "6 \u2014 DESS mode (one-time)",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "0e409415c4fb4917",
+      "78327adfa02642dd",
+      "4e7dbb16524d476e",
+      "417ed956eecf401b",
+      "3d1f4de194854b9c"
+    ],
+    "x": 48,
+    "y": 1270,
+    "w": 664,
+    "h": 220
+  },
+  {
+    "id": "e3b45ecb85dd4c1f",
+    "type": "inject",
+    "name": "Every hour",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "",
+    "crontab": "0 * * * *",
+    "once": false,
+    "onceDelay": 0.1,
+    "topic": "rolling",
+    "payload": "",
+    "payloadType": "date",
+    "x": 170,
+    "y": 330,
+    "wires": [
+      [
+        "e66c8d98dcfe4ef1"
+      ]
+    ],
+    "g": "c7a7666febcb476b",
+    "z": "1bff9db5d5d24e43"
+  },
+  {
+    "id": "e66c8d98dcfe4ef1",
+    "type": "function",
+    "name": "Load cached cheapest hour",
+    "func": "const TZ = 'Europe/Amsterdam';\nconst ymdFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });\nconst hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' });\nfunction localParts(d) {\n    return Object.fromEntries(ymdFmt.formatToParts(d).filter(x => x.type !== 'literal').map(x => [x.type, x.value]));\n}\nfunction localYmd(d) {\n    const p = localParts(d);\n    return p.year + '-' + p.month + '-' + p.day;\n}\n// Calendar-day arithmetic on the local date (DST-safe, unlike now + 24h).\nfunction localYmdPlusDays(d, days) {\n    const p = localParts(d);\n    const t = new Date(Date.UTC(+p.year, +p.month - 1, +p.day + days));\n    return t.getUTCFullYear() + '-' + String(t.getUTCMonth() + 1).padStart(2, '0') + '-' + String(t.getUTCDate()).padStart(2, '0');\n}\nfunction localHour(d) {\n    return parseInt(hourFmt.format(d), 10);\n}\n// Drop targets whose hour has ended; return { targets, active } where active is the earliest remaining.\n// Ended windows are kept for 48 h: the rules planner uses their price as\n// \"what the energy in the battery cost\".\nfunction activeTarget(targets, nowMs) {\n    const kept = {};\n    let active = null;\n    for (const [date, t] of Object.entries(targets || {})) {\n        if (!t || !Number.isInteger(t.hour) || !t.end) continue;\n        const end = Date.parse(t.end);\n        if (end <= nowMs - 48 * 3600 * 1000) continue;\n        kept[date] = t;\n        if (end > nowMs && (!active || Date.parse(t.start) < Date.parse(active.start))) active = t;\n    }\n    return { targets: kept, active };\n}\n\nconst cfg = flow.get('cheapestHourDessConfig');\nif (!cfg) {\n    node.status({ fill: 'red', shape: 'ring', text: 'no config' });\n    node.error('No configuration loaded. Deploy the flow.');\n    return [null, null];\n}\nconst now = new Date();\nconst nowMs = now.getTime();\nconst tomorrow = localYmdPlusDays(now, 1);\nconst { targets, active } = activeTarget(flow.get('cheapestHourDessTargets'), nowMs);\nflow.set('cheapestHourDessTargets', targets);\n\nconst force = msg.topic === 'refresh';\nconst refreshFrom = Number.isInteger(cfg.refreshFromHour) ? cfg.refreshFromHour : 15;\nconst lastFetch = flow.get('cheapestHourDessLastFetch') || 0;\nconst throttleOk = nowMs - lastFetch >= 30 * 60 * 1000;   // at most every 30 min (in practice each hourly run) if EnergyZero is late\nconst prices = flow.get('cheapestHourDessPrices') || {};\nconst missingNow = prices[String(Math.floor(nowMs / 3600000) * 3600000)] === undefined;\nlet priceDate = null;\nif (force || (!targets[tomorrow] && localHour(now) >= refreshFrom && throttleOk)) priceDate = tomorrow;\nelse if (missingNow && throttleOk) priceDate = localYmdPlusDays(now, 0);   // e.g. first run after a restart\n\nmsg.config = cfg;\nif (priceDate) {\n    msg.priceDate = priceDate;\n    flow.set('cheapestHourDessLastFetch', nowMs);\n    node.status({ fill: 'blue', shape: 'ring', text: 'refreshing prices for ' + priceDate });\n    return [null, msg];\n}\nconst hh = h => String(h).padStart(2, '0') + ':00';\nnode.status(active\n    ? { fill: 'green', shape: 'dot', text: 'next charge ' + active.date + ' ' + hh(active.hour) + '-' + hh(Number.isInteger(active.goalHour) ? active.goalHour : active.hour + 1) }\n    : { fill: 'grey', shape: 'dot', text: 'no charge window pending' });\nreturn [msg, null];",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 460,
+    "y": 390,
+    "wires": [
+      [
+        "8c3e1f2a9b7d4e60"
+      ],
+      [
+        "731915f70e0546ba"
+      ]
+    ],
+    "g": "c7a7666febcb476b",
+    "z": "1bff9db5d5d24e43"
+  },
+  {
+    "id": "731915f70e0546ba",
+    "type": "link out",
+    "name": "refresh prices",
+    "mode": "link",
+    "links": [
+      "37a14ff605b84360"
+    ],
+    "x": 655,
+    "y": 420,
+    "wires": [],
+    "g": "c7a7666febcb476b",
+    "z": "1bff9db5d5d24e43"
+  },
+  {
+    "id": "37a14ff605b84360",
+    "type": "link in",
+    "name": "refresh prices",
+    "links": [
+      "731915f70e0546ba"
+    ],
+    "x": 95,
+    "y": 640,
+    "wires": [
+      [
+        "fabc9f96e6a54c40"
+      ]
+    ],
+    "g": "196d9d93f2f644d6",
+    "z": "1bff9db5d5d24e43"
+  },
+  {
+    "id": "5d2ad0d7b17b4076",
+    "type": "function",
+    "name": "Store charge window",
+    "func": "const TZ = 'Europe/Amsterdam';\nconst ymdFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' });\nconst hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hourCycle: 'h23' });\nfunction localParts(d) {\n    return Object.fromEntries(ymdFmt.formatToParts(d).filter(x => x.type !== 'literal').map(x => [x.type, x.value]));\n}\nfunction localYmd(d) {\n    const p = localParts(d);\n    return p.year + '-' + p.month + '-' + p.day;\n}\n// Calendar-day arithmetic on the local date (DST-safe, unlike now + 24h).\nfunction localYmdPlusDays(d, days) {\n    const p = localParts(d);\n    const t = new Date(Date.UTC(+p.year, +p.month - 1, +p.day + days));\n    return t.getUTCFullYear() + '-' + String(t.getUTCMonth() + 1).padStart(2, '0') + '-' + String(t.getUTCDate()).padStart(2, '0');\n}\nfunction localHour(d) {\n    return parseInt(hourFmt.format(d), 10);\n}\n// Drop targets whose hour has ended; return { targets, active } where active is the earliest remaining.\n// Ended windows are kept for 48 h: the rules planner uses their price as\n// \"what the energy in the battery cost\".\nfunction activeTarget(targets, nowMs) {\n    const kept = {};\n    let active = null;\n    for (const [date, t] of Object.entries(targets || {})) {\n        if (!t || !Number.isInteger(t.hour) || !t.end) continue;\n        const end = Date.parse(t.end);\n        if (end <= nowMs - 48 * 3600 * 1000) continue;\n        kept[date] = t;\n        if (end > nowMs && (!active || Date.parse(t.start) < Date.parse(active.start))) active = t;\n    }\n    return { targets: kept, active };\n}\n\nconst stored = Object.assign({}, flow.get('cheapestHourDessTargets') || {});\nif (msg.found) {\n    stored[msg.found.date] = Object.assign({}, msg.found, { fetchedAt: Date.now() });\n}\nconst { targets, active } = activeTarget(stored, Date.now());\nflow.set('cheapestHourDessTargets', targets);\n// Do not leak EnergyZero HTTP response fields into the rest of the flow.\nfor (const k of ['headers', 'statusCode', 'responseUrl', 'redirectList', 'retry']) delete msg[k];\nconst hh = h => String(h).padStart(2, '0') + ':00';\nnode.status(active\n    ? { fill: 'green', shape: 'dot', text: 'next charge ' + active.date + ' ' + hh(active.hour) + '-' + hh(Number.isInteger(active.goalHour) ? active.goalHour : active.hour + 1) }\n    : { fill: 'grey', shape: 'dot', text: 'no charge window pending' });\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 1280,
+    "y": 640,
+    "wires": [
+      [
+        "0a809bc2bc0347f1"
+      ]
+    ],
+    "g": "196d9d93f2f644d6",
+    "z": "1bff9db5d5d24e43"
+  },
+  {
+    "id": "0a809bc2bc0347f1",
+    "type": "link out",
+    "name": "to planner",
+    "mode": "link",
+    "links": [
+      "0aa04a518fc647ac"
+    ],
+    "x": 1505,
+    "y": 640,
+    "wires": [],
+    "g": "196d9d93f2f644d6",
+    "z": "1bff9db5d5d24e43"
+  },
+  {
+    "id": "0aa04a518fc647ac",
+    "type": "link in",
+    "name": "to planner",
+    "links": [
+      "0a809bc2bc0347f1",
+      "8c3e1f2a9b7d4e60"
+    ],
+    "x": 95,
+    "y": 890,
+    "wires": [
+      [
+        "7e2b9c4d1a6f3e58"
+      ]
+    ],
+    "g": "5e76815cd26147e7",
+    "z": "1bff9db5d5d24e43"
+  },
+  {
+    "id": "8c3e1f2a9b7d4e60",
+    "type": "link out",
+    "z": "1bff9db5d5d24e43",
+    "g": "c7a7666febcb476b",
+    "name": "to planner",
+    "links": [
+      "0aa04a518fc647ac"
+    ],
+    "x": 655,
+    "y": 360,
+    "mode": "link",
+    "wires": []
+  },
+  {
+    "id": "4b9d2c7e1f3a5d80",
+    "type": "link out",
+    "z": "1bff9db5d5d24e43",
+    "g": "5e76815cd26147e7",
+    "name": "write schedule",
+    "links": [
+      "d6a1e8b3c4f29071"
+    ],
+    "x": 405,
+    "y": 890,
+    "mode": "link",
+    "wires": []
+  },
+  {
+    "id": "d6a1e8b3c4f29071",
+    "type": "link in",
+    "z": "1bff9db5d5d24e43",
+    "g": "d127c683f880458a",
+    "name": "write schedule",
+    "links": [
+      "4b9d2c7e1f3a5d80"
+    ],
+    "x": 95,
+    "y": 1140,
+    "wires": [
+      [
+        "24eb670ca3ff47cf"
+      ]
+    ]
+  },
+  {
+    "id": "7e2b9c4d1a6f3e58",
+    "type": "function",
+    "z": "1bff9db5d5d24e43",
+    "g": "5e76815cd26147e7",
+    "name": "Rules planner",
+    "func": "// Rule-based plan, one slot per hour, from now until the last known price:\n//   charge  - inside a charge window: TargetSoc = targetSoc, Strategy 2 (PROBATTERY)\n//             -> GX charges from grid at up to BatteryChargeLimit (tb_max)\n//   self    - price > charge price / roundTripEfficiency + b_cycle_cost:\n//             Strategy 1 (SELFCONSUME) + Restriction 1 (no battery -> grid); TargetSoc = minSoc\n//             (the GX ignores the target in self-consume; it only shapes the plan graph)\n//             -> battery follows live consumption, never exports\n//   hold    - otherwise: TargetSoc 100, Strategy 2 + Restriction 2 (no grid -> battery)\n//             -> battery does not discharge (grid covers loads), solar surplus may still charge it\n// \"Charge price\" = average price of the most recent charge window that has ended\n// (the energy now in the battery); before the first one, the upcoming window.\nconst cfg = msg.config || flow.get('cheapestHourDessConfig') || {};\nconst prices = flow.get('cheapestHourDessPrices') || {};\nconst targets = flow.get('cheapestHourDessTargets') || {};\nconst SLOTS = Number.isInteger(cfg.scheduleSlots) && cfg.scheduleSlots > 0 ? cfg.scheduleSlots : 48;\nconst eff = Number(cfg.roundTripEfficiency) > 0 && Number(cfg.roundTripEfficiency) <= 1 ? Number(cfg.roundTripEfficiency) : 1;\nconst cycle = Number.isFinite(Number(cfg.b_cycle_cost)) ? Number(cfg.b_cycle_cost) : 0;\nconst goal = Number(cfg.targetSoc) > 0 ? Number(cfg.targetSoc) : 100;\nconst feedIn = cfg.feed_in_possible === false ? 0 : 1;\nconst minSoc = Number(cfg.minSoc) > 0 && Number(cfg.minSoc) < 100 ? Number(cfg.minSoc) : 10;\nconst H = 3600000;\n\nconst windows = Object.values(targets)\n    .filter(t => t && t.start && t.end && Number.isFinite(Number(t.price)))\n    .map(t => ({ start: Date.parse(t.start), end: Date.parse(t.end), price: Number(t.price), date: t.date }))\n    .sort((a, b) => a.start - b.start);\n\nconst hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Amsterdam', day: '2-digit', hour: '2-digit', hourCycle: 'h23' });\nconst label = t => hourFmt.format(new Date(t)).replace(', ', ' ') + ':00';\n\nconst h0 = Math.floor(Date.now() / H) * H;\nconst slots = [];\nconst plan = [];\nconst viewHours = [];   // for the schedule viewer (GET /dess)\nconst counts = { charge: 0, self: 0, hold: 0 };\nfor (let i = 0; i < SLOTS; i++) {\n    const t = h0 + i * H;\n    const price = prices[String(t)];\n    if (price === undefined) break;                 // end of known prices\n    const win = windows.find(w => w.start <= t && t < w.end);\n    let mode, strategy, targetSoc, restrictions, threshold = null;\n    if (win) {\n        mode = 'charge'; strategy = 2; targetSoc = goal; restrictions = 0;\n    } else {\n        const past = windows.filter(w => w.end <= t).pop();\n        const ref = past || windows.find(w => w.start > t);\n        threshold = ref ? ref.price / eff + cycle : null;\n        if (threshold === null || price > threshold + 1e-6) {   // 1e-6: ignore floating-point noise; equal price = hold\n            mode = 'self'; strategy = 1; targetSoc = minSoc; restrictions = 1;\n        } else {\n            mode = 'hold'; strategy = 2; targetSoc = 100; restrictions = 2;\n        }\n    }\n    counts[mode]++;\n    viewHours.push({ start: t, mode: mode, price: price, threshold: threshold, targetSoc: targetSoc, strategy: strategy, restrictions: restrictions });\n    slots.push({ mode: mode, Start: t / 1000, Duration: 3600, TargetSoc: targetSoc, AllowGridFeedIn: feedIn, Restrictions: restrictions, Strategy: strategy });\n    plan.push(label(t) + '  ' + mode.padEnd(6) + ' ' + price.toFixed(4) + (threshold !== null ? ' (threshold ' + threshold.toFixed(4) + ')' : ''));\n}\nif (!slots.length) {\n    node.status({ fill: 'yellow', shape: 'ring', text: 'no prices for the current hour yet' });\n    node.warn('Rules planner: no price for the current hour yet; waiting for the next price refresh.');\n    return null;\n}\nflow.set('cheapestHourDessPlan', { plannedAt: Date.now(), hours: viewHours });\nmsg.slots = slots;\nmsg.payload = plan;            // shown by the \"Rules plan\" debug node\nmsg.topic = 'rules plan';\nnode.status({ fill: 'green', shape: 'dot', text: 'now ' + plan[0].split('  ')[1].trim().split(' ')[0] + ' / ' + counts.charge + 'h charge, ' + counts.self + 'h self-consume, ' + counts.hold + 'h hold' });\nreturn msg;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 250,
+    "y": 890,
+    "wires": [
+      [
+        "4b9d2c7e1f3a5d80",
+        "3f8a1c6e9b2d4a70"
+      ]
+    ]
+  },
+  {
+    "id": "3f8a1c6e9b2d4a70",
+    "type": "debug",
+    "z": "1bff9db5d5d24e43",
+    "g": "5e76815cd26147e7",
+    "name": "Rules plan (per hour)",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 490,
+    "y": 950,
+    "wires": []
+  },
+  {
+    "id": "a7d3e9f1c2b84d60",
+    "type": "group",
+    "z": "1bff9db5d5d24e43",
+    "name": "7 \u2014 Schedule viewer (http://<gx>:<port>/dess)",
+    "style": {
+      "label": true
+    },
+    "nodes": [
+      "c4e8a1d7f9b23e51",
+      "e1f7b3a9d5c20468",
+      "9b2d6f8e4a1c7035",
+      "5f0c8b2e7d4a9163",
+      "5c1e8a3f7b2d9e41",
+      "9d4b6f2a1c8e7350"
+    ],
+    "x": 48,
+    "y": 1520,
+    "w": 644,
+    "h": 220
+  },
+  {
+    "id": "c4e8a1d7f9b23e51",
+    "type": "comment",
+    "z": "1bff9db5d5d24e43",
+    "g": "a7d3e9f1c2b84d60",
+    "name": "Schedule viewer",
+    "info": "Open http://<GX address>:<Node-RED port>/dess in a browser for a chart and table of the current plan.\n/dess?format=json returns the same data as JSON.\nRead-only: shows what the Rules planner stored in flow context (cheapestHourDessPlan); nothing is written to the GX.\nIf Node-RED has httpNodeRoot or httpNodeAuth set in settings.js, the URL/login follows those settings.",
+    "x": 160,
+    "y": 1580,
+    "wires": []
+  },
+  {
+    "id": "e1f7b3a9d5c20468",
+    "type": "http in",
+    "z": "1bff9db5d5d24e43",
+    "g": "a7d3e9f1c2b84d60",
+    "name": "GET /dess",
+    "url": "/dess",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 150,
+    "y": 1640,
+    "wires": [
+      [
+        "9b2d6f8e4a1c7035"
+      ]
+    ]
+  },
+  {
+    "id": "9b2d6f8e4a1c7035",
+    "type": "function",
+    "z": "1bff9db5d5d24e43",
+    "g": "a7d3e9f1c2b84d60",
+    "name": "Render schedule page",
+    "func": "// GET /dess        -> HTML page with the current plan (chart + table)\n// GET /dess?format=json -> the same data as JSON\n// Reads what the Rules planner stored in flow context (cheapestHourDessPlan);\n// nothing is written to the GX from here.\nconst cfg = flow.get('cheapestHourDessConfig') || {};\nconst stored = flow.get('cheapestHourDessPlan');\nconst targets = flow.get('cheapestHourDessTargets') || {};\nconst TZ = 'Europe/Amsterdam';\nconst H = 3600000;\nconst nowMs = Date.now();\nconst soc = flow.get('cheapestHourDessSoc');   // { value, at } from the \"Battery SoC\" node\n\n// Only hours that have not ended yet (the plan is refreshed every hour).\nconst hours = stored && Array.isArray(stored.hours)\n    ? stored.hours.filter(h => h.start + H > nowMs)\n    : [];\nconst windows = Object.values(targets)\n    .filter(t => t && t.start && t.end)\n    .map(t => ({ date: t.date, start: t.start, end: t.end, price: t.price, hours: t.hours }))\n    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));\n\nif (msg.req && msg.req.query && msg.req.query.format === 'json') {\n    msg.headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };\n    msg.payload = { plannedAt: stored ? stored.plannedAt : null, now: nowMs, soc: soc || null, config: cfg, chargeWindows: windows, hours: hours };\n    return msg;\n}\n\nconst esc = s => String(s).replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\nconst fmtHour = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });\nconst fmtDay = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', day: '2-digit', month: 'short' });\nconst fmtFull = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });\nconst eur = v => (v === null || v === undefined) ? '\u2013' : '\u20ac' + Number(v).toFixed(4);\nconst MODES = {\n    charge: { label: 'Charge', desc: 'charge from grid to ' + (cfg.targetSoc || 100) + '%' },\n    self:   { label: 'Self-consume', desc: 'battery covers the load, no export' },\n    hold:   { label: 'Hold', desc: 'no discharge, grid covers the load' }\n};\n\n// ---------- chart (server-side SVG) ----------\nlet chart = '<p class=\"empty\">No plan yet. Press <b>Run now (test)</b> in the flow, or wait for the next hourly run.</p>';\nif (hours.length) {\n    const W = 960, HGT = 300, padL = 56, padR = 12, padT = 16, padB = 44;\n    const plotW = W - padL - padR, plotH = HGT - padT - padB;\n    const vals = hours.map(h => h.price).concat(hours.filter(h => h.threshold !== null).map(h => h.threshold));\n    let lo = Math.min(0, ...vals), hi = Math.max(...vals);\n    // \"nice\" axis steps\n    const rawStep = (hi - lo) / 4 || 0.05;\n    const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));\n    const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= rawStep);\n    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;\n    if (hi === lo) hi = lo + step;\n    const y = v => padT + plotH - (v - lo) / (hi - lo) * plotH;\n    const colW = plotW / hours.length;\n    const barW = Math.max(2, colW - 2);               // 2px surface gap between bars\n    const r = Math.min(4, barW / 2);\n    const x0 = i => padL + i * colW + (colW - barW) / 2;\n    const parts = [];\n\n    // grid + y labels\n    for (let v = lo; v <= hi + step / 2; v += step) {\n        const yy = y(v).toFixed(1);\n        parts.push('<line class=\"grid\" x1=\"' + padL + '\" x2=\"' + (W - padR) + '\" y1=\"' + yy + '\" y2=\"' + yy + '\"/>');\n        parts.push('<text class=\"axis\" x=\"' + (padL - 8) + '\" y=\"' + yy + '\" dy=\"0.32em\" text-anchor=\"end\">' + v.toFixed(2) + '</text>');\n    }\n    // midnight separators + x labels every 3 hours\n    hours.forEach((h, i) => {\n        const hh = fmtHour.format(new Date(h.start));\n        const cx = padL + i * colW;\n        if (hh === '00:00' && i > 0) {\n            parts.push('<line class=\"day\" x1=\"' + cx.toFixed(1) + '\" x2=\"' + cx.toFixed(1) + '\" y1=\"' + padT + '\" y2=\"' + (padT + plotH) + '\"/>');\n            parts.push('<text class=\"axis day-label\" x=\"' + (cx + 4).toFixed(1) + '\" y=\"' + (padT + 10) + '\">' + esc(fmtDay.format(new Date(h.start))) + '</text>');\n        }\n        if (i % 3 === 0) {\n            parts.push('<text class=\"axis\" x=\"' + (cx + colW / 2).toFixed(1) + '\" y=\"' + (padT + plotH + 16) + '\" text-anchor=\"middle\">' + hh.slice(0, 2) + '</text>');\n        }\n    });\n    // bars: rounded data end, square at the zero baseline\n    const base = y(0);\n    hours.forEach((h, i) => {\n        const x = x0(i), top = y(h.price);\n        const up = top <= base, len = Math.abs(base - top);\n        const rr = Math.min(r, len);\n        let d;\n        if (len < 0.5) d = 'M' + x + ',' + base + 'h' + barW;\n        else if (up) d = 'M' + x + ',' + base + 'V' + (top + rr) + 'Q' + x + ',' + top + ' ' + (x + rr) + ',' + top\n            + 'H' + (x + barW - rr) + 'Q' + (x + barW) + ',' + top + ' ' + (x + barW) + ',' + (top + rr) + 'V' + base + 'Z';\n        else d = 'M' + x + ',' + base + 'V' + (top - rr) + 'Q' + x + ',' + top + ' ' + (x + rr) + ',' + top\n            + 'H' + (x + barW - rr) + 'Q' + (x + barW) + ',' + top + ' ' + (x + barW) + ',' + (top - rr) + 'V' + base + 'Z';\n        parts.push('<path class=\"bar m-' + h.mode + (i === 0 ? ' now' : '') + '\" d=\"' + d + '\"/>');\n    });\n    parts.push('<line class=\"baseline\" x1=\"' + padL + '\" x2=\"' + (W - padR) + '\" y1=\"' + base.toFixed(1) + '\" y2=\"' + base.toFixed(1) + '\"/>');\n    // threshold as a step line (same unit and axis as the price)\n    let tp = '';\n    hours.forEach((h, i) => {\n        if (h.threshold === null) { tp += ' '; return; }\n        const yy = y(h.threshold).toFixed(1);\n        const xa = (padL + i * colW).toFixed(1), xb = (padL + (i + 1) * colW).toFixed(1);\n        tp += (tp.endsWith(' ') || !tp ? 'M' : 'L') + xa + ',' + yy + 'L' + xb + ',' + yy;\n    });\n    if (tp.trim()) parts.push('<path class=\"threshold\" d=\"' + tp.trim().replace(/ +/g, ' ') + '\"/>');\n    // \"now\" marker\n    const nowX = padL + Math.min(1, Math.max(0, (nowMs - hours[0].start) / H)) * colW;\n    parts.push('<line class=\"nowline\" x1=\"' + nowX.toFixed(1) + '\" x2=\"' + nowX.toFixed(1) + '\" y1=\"' + padT + '\" y2=\"' + (padT + plotH) + '\"/>');\n    parts.push('<text class=\"axis\" x=\"' + nowX.toFixed(1) + '\" y=\"' + (padT + plotH + 32) + '\" text-anchor=\"middle\">now</text>');\n    // hover targets: the full column, larger than the bar\n    hours.forEach((h, i) => {\n        const tip = fmtFull.format(new Date(h.start)) + '|' + MODES[h.mode].label + '|' + eur(h.price)\n            + '|' + (h.threshold === null ? '' : eur(h.threshold)) + '|' + h.targetSoc;\n        parts.push('<rect class=\"hit\" x=\"' + (padL + i * colW).toFixed(1) + '\" y=\"' + padT + '\" width=\"' + colW.toFixed(1) + '\" height=\"' + plotH + '\" data-tip=\"' + esc(tip) + '\"/>');\n    });\n    chart = '<svg viewBox=\"0 0 ' + W + ' ' + HGT + '\" role=\"img\" aria-label=\"Planned battery mode and price per hour\">'\n        + parts.join('') + '</svg>';\n}\n\n// ---------- summary + table ----------\nconst cur = hours.find(h => h.start <= nowMs && nowMs < h.start + H) || hours[0];\nconst counts = { charge: 0, self: 0, hold: 0 };\nhours.forEach(h => counts[h.mode]++);\nconst next = windows.find(w => Date.parse(w.end) > nowMs);\nconst tiles = [\n    ['Now', cur ? MODES[cur.mode].label : '\u2013', cur ? MODES[cur.mode].desc : ''],\n    ['Battery SoC', soc && soc.value !== null ? Number(soc.value).toFixed(0) + '%' : '\u2013',\n        !soc ? 'waiting for the GX' : (soc.value === null ? 'unknown since ' : 'last change ') + fmtHour.format(new Date(soc.at))],\n    ['Price now', cur ? eur(cur.price) : '\u2013', cur && cur.threshold !== null ? 'threshold ' + eur(cur.threshold) : ''],\n    ['Next charge window', next ? fmtFull.format(new Date(next.start)) + ' \u2013 ' + fmtHour.format(new Date(next.end)) : 'none yet',\n        next ? 'avg ' + eur(next.price) : 'tomorrow\u2019s prices arrive in the afternoon'],\n    ['Planned hours', String(hours.length), counts.charge + ' charge \u00b7 ' + counts.self + ' self \u00b7 ' + counts.hold + ' hold']\n];\nconst rows = hours.map(h => '<tr class=\"' + (h === cur ? 'cur' : '') + '\"><td>' + esc(fmtFull.format(new Date(h.start)))\n    + '</td><td><span class=\"sw m-' + h.mode + '\"></span>' + MODES[h.mode].label\n    + '</td><td class=\"num\">' + eur(h.price) + '</td><td class=\"num\">' + eur(h.threshold)\n    + '</td><td class=\"num\">' + h.targetSoc + '%</td><td class=\"num\">' + h.strategy + '/' + h.restrictions + '</td></tr>').join('');\n\nmsg.headers = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' };\nmsg.payload = `<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta http-equiv=\"refresh\" content=\"300\">\n<title>DESS schedule</title>\n<style>\n.viz-root{color-scheme:light;--surface-1:#fcfcfb;--surface-2:#f3f2ef;--text-primary:#0b0b0b;--text-secondary:#52514e;\n  --grid:#e4e3df;--axis:#8a8984;--s-charge:#2a78d6;--s-self:#eb6834;--s-hold:#1baf7a}\n@media (prefers-color-scheme:dark){.viz-root{color-scheme:dark;--surface-1:#1a1a19;--surface-2:#242422;--text-primary:#f0efec;\n  --text-secondary:#c3c2b7;--grid:#33332f;--axis:#7d7c76;--s-charge:#3987e5;--s-self:#d95926;--s-hold:#199e70}}\nhtml,body{margin:0}\nbody.viz-root{background:var(--surface-1);color:var(--text-primary);font:14px/1.4 system-ui,-apple-system,\"Segoe UI\",sans-serif}\nmain{max-width:1000px;margin:0 auto;padding:20px}\nh1{font-size:20px;margin:0 0 2px}.sub{color:var(--text-secondary);margin:0 0 16px}\n.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}\n.tile{background:var(--surface-2);border-radius:8px;padding:10px 12px}\n.tile .k{color:var(--text-secondary);font-size:12px}.tile .v{font-size:18px;font-weight:600}.tile .d{color:var(--text-secondary);font-size:12px}\n.legend{display:flex;flex-wrap:wrap;gap:16px;color:var(--text-secondary);font-size:13px;margin:4px 0 6px}\n.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}\n.sw.line{height:0;border-top:2px dashed var(--text-secondary);border-radius:0;vertical-align:3px;width:16px}\n.m-charge{fill:var(--s-charge);background:var(--s-charge)}.m-self{fill:var(--s-self);background:var(--s-self)}.m-hold{fill:var(--s-hold);background:var(--s-hold)}\n.chart{position:relative}svg{width:100%;height:auto;display:block}\n.grid{stroke:var(--grid);stroke-width:1}.baseline{stroke:var(--axis);stroke-width:1}\n.day{stroke:var(--axis);stroke-width:1;stroke-dasharray:2 3}\n.axis{fill:var(--text-secondary);font-size:11px}.day-label{font-weight:600}\n.threshold{fill:none;stroke:var(--text-primary);stroke-width:2;stroke-dasharray:5 4;opacity:.7}\n.nowline{stroke:var(--text-primary);stroke-width:1.5}\n.hit{fill:transparent;cursor:crosshair}.hit:hover{fill:var(--text-primary);fill-opacity:.06}\n.tip{position:absolute;pointer-events:none;background:var(--surface-1);color:var(--text-primary);border:1px solid var(--grid);\n  border-radius:6px;padding:6px 8px;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap;display:none}\n.tip b{display:block}.tip .muted{color:var(--text-secondary)}\ndetails{margin-top:16px}summary{cursor:pointer;color:var(--text-secondary)}\ntable{border-collapse:collapse;width:100%;margin-top:8px;font-size:13px}\nth,td{padding:4px 8px;border-bottom:1px solid var(--grid);text-align:left}th{color:var(--text-secondary);font-weight:500}\ntd.num,th.num{text-align:right;font-variant-numeric:tabular-nums}tr.cur td{font-weight:600}\n.empty{padding:40px;text-align:center;color:var(--text-secondary)}\nfooter{color:var(--text-secondary);font-size:12px;margin-top:16px}\n</style></head>\n<body class=\"viz-root\"><main>\n<h1>DESS schedule</h1>\n<p class=\"sub\">Planned ${stored ? esc(fmtFull.format(new Date(stored.plannedAt))) : '\u2013'} \u00b7 prices: EnergyZero ${esc(cfg.priceProperty || 'all_in_with_vat')} (EUR/kWh) \u00b7 charge ${esc(cfg.chargeHours || 3)} h to ${esc(cfg.targetSoc || 100)}%</p>\n<div class=\"tiles\">${tiles.map(t => '<div class=\"tile\"><div class=\"k\">' + esc(t[0]) + '</div><div class=\"v\">' + esc(t[1]) + '</div><div class=\"d\">' + esc(t[2]) + '</div></div>').join('')}</div>\n<div class=\"legend\">\n  <span><span class=\"sw m-charge\"></span>Charge (${counts.charge} h)</span>\n  <span><span class=\"sw m-self\"></span>Self-consume (${counts.self} h)</span>\n  <span><span class=\"sw m-hold\"></span>Hold (${counts.hold} h)</span>\n  <span><span class=\"sw line\"></span>Self-consume threshold</span>\n</div>\n<div class=\"chart\">${chart}<div class=\"tip\" id=\"tip\"></div></div>\n<details${hours.length && hours.length <= 12 ? ' open' : ''}><summary>Table (${hours.length} hours)</summary>\n<table><thead><tr><th>Hour</th><th>Mode</th><th class=\"num\">Price</th><th class=\"num\">Threshold</th><th class=\"num\">Target SOC</th><th class=\"num\">Strategy/Restr.</th></tr></thead>\n<tbody>${rows}</tbody></table></details>\n<footer>Read-only view of the plan in flow context; refreshes every 5 minutes. JSON: <a href=\"?format=json\">?format=json</a></footer>\n</main>\n<script>\n(function(){var tip=document.getElementById('tip'),box=document.querySelector('.chart');if(!box)return;\nbox.addEventListener('mousemove',function(e){var t=e.target;if(!t.dataset||!t.dataset.tip){tip.style.display='none';return;}\nvar p=t.dataset.tip.split('|'),b=box.getBoundingClientRect();\ntip.innerHTML='<b>'+p[0]+'</b>'+p[1]+' \u00b7 target '+p[4]+'%<br>price '+p[2]+(p[3]?'<br><span class=\"muted\">threshold '+p[3]+'</span>':'');\ntip.style.display='block';var x=e.clientX-b.left+12;if(x+tip.offsetWidth>b.width)x=e.clientX-b.left-tip.offsetWidth-12;\ntip.style.left=x+'px';tip.style.top=(e.clientY-b.top+12)+'px';});\nbox.addEventListener('mouseleave',function(){tip.style.display='none';});})();\n</script>\n</body></html>`;\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 370,
+    "y": 1640,
+    "wires": [
+      [
+        "5f0c8b2e7d4a9163"
+      ]
+    ]
+  },
+  {
+    "id": "5f0c8b2e7d4a9163",
+    "type": "http response",
+    "z": "1bff9db5d5d24e43",
+    "g": "a7d3e9f1c2b84d60",
+    "name": "",
+    "statusCode": "",
+    "headers": {},
+    "x": 570,
+    "y": 1640,
+    "wires": []
+  },
+  {
+    "id": "5c1e8a3f7b2d9e41",
+    "type": "victron-input-custom",
+    "z": "1bff9db5d5d24e43",
+    "g": "a7d3e9f1c2b84d60",
+    "service": "com.victronenergy.system",
+    "path": "/Dc/Battery/Soc",
+    "serviceObj": {
+      "service": "com.victronenergy.system",
+      "name": "com.victronenergy.system"
+    },
+    "pathObj": {
+      "path": "/Dc/Battery/Soc",
+      "name": "Battery State of Charge (%)",
+      "type": "float"
+    },
+    "name": "Battery SoC",
+    "onlyChanges": true,
+    "roundValues": "1",
+    "x": 150,
+    "y": 1700,
+    "wires": [
+      [
+        "9d4b6f2a1c8e7350"
+      ]
+    ]
+  },
+  {
+    "id": "9d4b6f2a1c8e7350",
+    "type": "function",
+    "z": "1bff9db5d5d24e43",
+    "g": "a7d3e9f1c2b84d60",
+    "name": "Store current SoC",
+    "func": "// Latest battery SoC for the /dess page (read-only; not used by the planner).\n// null/empty = the GX reports no valid SoC (e.g. battery monitor offline): store it as unknown, not 0.\nconst raw = msg.payload;\nconst v = (typeof raw === 'number' || (typeof raw === 'string' && raw.trim() !== '')) ? Number(raw) : NaN;\nconst value = Number.isFinite(v) ? v : null;\nflow.set('cheapestHourDessSoc', { value: value, at: Date.now() });\nnode.status(value === null ? { fill: 'grey', shape: 'ring', text: 'unknown' } : { fill: 'green', shape: 'dot', text: value.toFixed(1) + '%' });\nreturn null;",
+    "outputs": 0,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 370,
+    "y": 1700,
+    "wires": []
+  }
+]
