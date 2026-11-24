@@ -3,11 +3,11 @@
 This Node-RED flow runs on a Victron GX and plans the battery from **EnergyZero** day-ahead prices (Dutch market, no API key):
 
 - **Charge** to 100% during the cheapest block of `chargeHours` consecutive hours (default 3).
-- In every other hour:
+- In every other hour (or quarter, with 15-minute prices):
   - **Self-consume** if the price is higher than what the stored energy cost plus the battery cost. The battery follows the live consumption and never exports.
   - Otherwise **hold**: the battery does not discharge and the grid covers the load.
 
-The plan is written into the GX's Dynamic ESS schedule slots, with DESS in **mode 4 (Node-RED)**. No VRM account, token or API is used.
+Prices can be hourly or per 15 minutes (`priceInterval`). The plan is written into the GX's Dynamic ESS schedule slots, with DESS in **mode 4 (Node-RED)**. No VRM account, token or API is used.
 
 ## What is in this repository
 
@@ -35,6 +35,7 @@ Open the function node **`Edit me: site configuration (On Start tab)`**, switch 
 
 ```js
 // Charge window
+priceInterval: 60,               // 60 = hourly prices, 15 = quarter-hour prices
 chargeHours: 3,                  // length of the charge window (hours it takes to fill the battery)
 targetSoc: 100,                  // SOC to charge to in the charge window
 priceProperty: 'all_in_with_vat',// EnergyZero price array to use
@@ -58,18 +59,19 @@ writeTargetSoc: true             // false on Venus OS versions without Schedule/
 
 Notes:
 
-- `chargeHours`: the flow picks tomorrow's cheapest block of this many consecutive hours (lowest average price, ties go to the earliest). `1` = the single cheapest hour.
+- `priceInterval`: `60` plans per hour with EnergyZero's hourly prices. `15` uses the quarter-hour prices (`INTERVAL_QUARTER`) and plans per 15 minutes, so the flow can also use cheap or expensive quarters within an hour. Changing it clears the cached prices and upcoming charge windows and fetches them again; ended windows stay as the price reference.
+- `chargeHours`: the flow picks tomorrow's cheapest block of this many consecutive hours (lowest average price, ties go to the earliest). `1` = the single cheapest hour. With `priceInterval: 15` the block can start at any quarter (e.g. 02:45–05:45), and fractions such as `2.5` or `2.75` work (rounded to whole quarters).
 - `tb_max` is the charge rate the GX uses in the charge window (**T**o **B**attery; `fb_max` = **F**rom **B**attery). If a full charge takes about 3 hours, `chargeHours: 3` fits.
 - `b_max`, `tb_max` and `fb_max` are written to the GX (`/Settings/DynamicEss/BatteryCapacity`, `BatteryChargeLimit`, `BatteryDischargeLimit`). The GX uses them to turn a target SOC into a charge rate (capacity × SOC difference / time left in the slot, capped by the limit). If `BatteryCapacity` is 0 or wrong, scheduled charging is too slow or does not happen.
 - `b_cycle_cost` and `roundTripEfficiency` set the self-consume threshold, see *How it works*. With `roundTripEfficiency: 1` the rule is exactly "price > charge price + battery cost". At 0.85, a kWh from the battery effectively costs `charge price / 0.85`.
 - `minSoc`: in self-consume hours the GX ignores the target SOC. The value only shapes the plan graph, so set it to your ESS minimum SOC to get a realistic line instead of 0%.
-- `priceProperty`: `all_in_with_vat` is the consumer all-in price including VAT, used for both the charge price and the hourly prices.
+- `priceProperty`: `all_in_with_vat` is the consumer all-in price including VAT, used for both the charge price and the prices per period.
 - `refreshFromHour`: EnergyZero publishes tomorrow's prices in the early afternoon. Until then it returns an error, and the flow retries every hour.
 - After editing, click **Deploy**. The *On Start* code runs on every deploy and restart, so you do not need to press **Reload config**. That button only re-applies the deployed settings, e.g. after flow context was cleared.
 
 ## One-time DESS mode switch
 
-After deploying, check the `Rules plan (per hour)` debug output (press **`Run now (test)`**), then:
+After deploying, check the `Rules plan (per period)` debug output (press **`Run now (test)`**), then:
 
 1. Click **`Set DESS mode = 4 (Node-RED)`**.
 2. Confirm the `Set DynamicEss/Mode` node status shows `4 (Node-RED)`.
@@ -84,32 +86,33 @@ Do not enable Dynamic ESS in VRM at the same time: VRM's Auto mode (1) writes th
 
 1. `Every hour` (at minute 0) triggers `Load cached cheapest hour`. It fetches EnergyZero prices when needed:
    - **tomorrow's prices**, from `refreshFromHour`, if tomorrow has no charge window yet;
-   - **today's prices**, if the current hour has no price (e.g. after a restart).
+   - **today's prices**, if the current period has no price (e.g. after a restart).
 
    Fetches are retried on each hourly run (at most once per 30 minutes, also when you press the buttons):
 
    ```text
-   https://public.api.energyzero.nl/public/v1/prices?energyType=ENERGY_TYPE_ELECTRICITY&date=DD-MM-YYYY&interval=INTERVAL_HOUR
+   https://public.api.energyzero.nl/public/v1/prices?energyType=ENERGY_TYPE_ELECTRICITY&date=DD-MM-YYYY&interval=INTERVAL_HOUR      (INTERVAL_QUARTER with priceInterval: 15)
    ```
 
-2. The response covers two days. All hourly prices are stored in flow context (`cheapestHourDessPrices`). The cheapest block of `chargeHours` hours on the requested date is stored as that day's charge window (`cheapestHourDessTargets`). Ended windows are kept for 48 hours as the price reference. If prices are not available yet, the cached plan is used unchanged.
-3. The `Rules planner` plans one slot per hour, from now until the last known price (up to 48 hours).
+2. The response covers two or three days. All prices are stored in flow context (`cheapestHourDessPrices`). The cheapest block of `chargeHours` hours on the requested date is stored as that day's charge window (`cheapestHourDessTargets`). Ended windows are kept for 48 hours as the price reference. If prices are not available yet, the cached plan is used unchanged.
+3. The `Rules planner` decides the mode per period (hour or quarter), from now until the last known price (up to 48 hours). Consecutive periods with the same settings are merged into one GX slot, e.g. *self-consume 17:15–21:45* or a whole charge window. That way the 48 slots cover the full horizon, also with 15-minute prices (one slot per quarter would only reach 12 hours ahead).
 4. `Map plan to dbus writes` writes the changes to the GX schedule slots.
 
 ### Rules
 
-| Hour | Condition | Slot | What the GX does |
+| Period | Condition | Slot | What the GX does |
 |---|---|---|---|
 | charge | inside the charge window | `Strategy` 2, `TargetSoc` = `targetSoc` | charges from the grid at up to `tb_max` |
 | self-consume | price > charge price / `roundTripEfficiency` + `b_cycle_cost` | `Strategy` 1, `Restrictions` 1 (no battery → grid), `TargetSoc` = `minSoc` | battery covers the live consumption, never exports; the target is ignored |
 | hold | otherwise (price equal or lower) | `Strategy` 2, `TargetSoc` 100, `Restrictions` 2 (no grid → battery) | battery does not discharge, grid covers the load; surplus solar can still charge it |
 
 - *Charge price* is the average price of the most recent charge window that has ended, i.e. what the energy in the battery cost. Before the first window has ended, the upcoming window is used.
+- A charge window is written as one slot, so the "time left in the slot" the GX uses for the charge rate is the rest of the window: it spreads the charge over the window (capped at `tb_max`) instead of aiming for `targetSoc` within each hour or quarter.
 - The 100% in hold hours is required, not cosmetic. With a target below the actual SOC, the GX would discharge towards it.
 - The behaviour per strategy follows Victron's GX code (`venus-dynamicess`).
 - The planner charges from the grid in the window regardless of the solar forecast. In sunny months a lower `targetSoc` may be better.
 
-The `Rules plan (per hour)` debug node shows the plan as text:
+The `Rules plan (per period)` debug node shows the plan as text, one line per hour or quarter:
 
 ```text
 25 01:00  self   0.2600 (threshold 0.2300)
@@ -126,30 +129,30 @@ com.victronenergy.settings
   /Settings/DynamicEss/BatteryCapacity, BatteryChargeLimit, BatteryDischargeLimit
 ```
 
-The GX uses whichever slot contains the current time; slot order does not matter. Each hour always goes into slot `period number % scheduleSlots`, so a slot keeps its hour until that hour has passed. `Soc` and `TargetSoc` get the same value: current Venus OS uses `TargetSoc` when it is above 0, older versions use `Soc`.
+The GX uses whichever slot contains the current time; slot order does not matter. A planned slot stays in the GX slot it already occupies (also when the current slot just continues, e.g. *self-consume until 21:45* planned an hour ago); new ones go into free slots. `Soc` and `TargetSoc` get the same value: current Venus OS uses `TargetSoc` when it is above 0, older versions use `Soc`.
 
 **Flash wear.** The GX stores these settings in a file via `localsettings`. Writing an unchanged value does nothing there, and changes are saved to flash at most once per 2-second burst. So the flow:
 
 - only sends values that differ from what it wrote before;
-- leaves slots whose hour has already ended untouched (the GX ignores them);
+- leaves slots whose period has already ended untouched (the GX ignores them);
 - disables unused slots with a single `Duration = 0` write;
-- only disables a slot before rewriting it if it still holds a current or future hour, so the GX never acts on a half-written slot;
+- only disables a slot before rewriting it if it still holds a current or future period, so the GX never acts on a half-written slot;
 - writes at 20 values per second, so a batch of changes falls into a few 2-second save windows.
 
-In a two-day simulation this came to about **13 settings-file saves per day**, mostly when tomorrow's prices arrive. An hourly run without changes writes nothing. Everything is sent once after each deploy or restart, which also disables slots left over from VRM Auto mode, and again every 6 hours; unchanged values in those repeats are ignored by the GX.
+In a two-day simulation with real prices, an hourly run without new prices wrote nothing, and tomorrow's prices arriving caused 5 (hourly) or 33 (15-minute) writes, one settings-file save. Everything is sent once after each deploy or restart, which also disables slots left over from VRM Auto mode, and again every 6 hours; unchanged values in those repeats are ignored by the GX.
 
 ## Debug nodes
 
 - `Selected charge window` — the charge window found by each price refresh (`msg.found` is `null` if prices were not available yet).
-- `Rules plan (per hour)` — mode, price and threshold for every planned hour.
+- `Rules plan (per period)` — mode, price and threshold for every planned hour or quarter.
 - `Schedule writes` — each dbus path/value written (only changes: usually nothing, a few hundred after a deploy).
 
 ## Schedule viewer
 
 Group **7 — Schedule viewer** serves a read-only page with the current plan. Open it at the same address as the Node-RED editor, with `/dess` appended (e.g. `https://venus.local:1881/dess`; if `httpNodeRoot` is set in `settings.js`, it goes in front of `/dess`).
 
-- A bar chart of the price per hour, coloured by mode (charge / self-consume / hold), with the self-consume threshold as a dashed line, day separators and a "now" marker. Hover over an hour for its details.
-- Summary tiles (current mode, battery SoC, current price vs. threshold, next charge window, hour counts) and a table you can expand.
+- A bar chart of the price per hour or quarter, coloured by mode (charge / self-consume / hold), with the self-consume threshold as a dashed line, day separators and a "now" marker. Hover over a bar for its details.
+- Summary tiles (current mode, battery SoC, current price vs. threshold, next charge window, planned hours per mode and the number of GX slots used) and a table you can expand.
 - `/dess?format=json` returns the same data as JSON, including `soc: { value, at }`.
 
 The battery SoC comes from the GX (`com.victronenergy.system` → `/Dc/Battery/Soc`) via the `Battery SoC` node, which only sends changes (rounded to 0.1%). The tile therefore shows the time of the *last change*, not of the last check. After a deploy it says "waiting for the GX" until the first value arrives. If the GX reports no valid SoC (e.g. the battery monitor is offline), the tile shows "unknown since …" instead of 0%.
@@ -159,10 +162,10 @@ The page shows what the `Rules planner` stored in flow context (`cheapestHourDes
 ## Troubleshooting
 
 - **Warning `EnergyZero has no ... prices for YYYY-MM-DD yet`** — normal before tomorrow's prices are published. The flow retries every hour and keeps running meanwhile. If it persists into the evening, check the endpoint and the GX timezone. Use `Force price refresh` to retry immediately.
-- **Rules planner: `no price for the current hour yet`** — first run after a restart; today's prices are fetched on the same or the next run.
-- **Battery discharges when it should hold** — check the `Rules plan (per hour)` output for that hour. If it says `self`, the price was above the threshold. Raise `b_cycle_cost` or lower `roundTripEfficiency` to hold more often.
+- **Rules planner: `no price for the current period yet`** — first run after a restart; today's prices are fetched on the same or the next run.
+- **Battery discharges when it should hold** — check the `Rules plan (per period)` output for that hour or quarter. If it says `self`, the price was above the threshold. Raise `b_cycle_cost` or lower `roundTripEfficiency` to hold more often.
 - **Battery does not reach `targetSoc` by the end of the charge window** — the GX charges at up to `tb_max`. Check that `tb_max` and `b_max` match reality, and increase `chargeHours` if charging takes longer. Confirm DESS mode is `4`.
-- **Write errors on `Schedule/4/...` or `.../TargetSoc`** — older Venus OS with 4 slots and no `TargetSoc`: set `scheduleSlots: 4` and `writeTargetSoc: false`.
+- **Write errors on `Schedule/4/...` or `.../TargetSoc`** — older Venus OS with 4 slots and no `TargetSoc`: set `scheduleSlots: 4` and `writeTargetSoc: false`. With 4 slots the plan reaches less far ahead (until the fifth change of mode).
 - **Plan graph shows a charge ramp at the start of every hold block** — the graph colours every step up to 100% as charging. In hold hours the GX is blocked from grid charging; the measured SOC line should stay flat there.
 - **Prices or charge windows lost after a Node-RED restart** — they are kept in flow context, which is in memory by default. Today's prices are fetched again automatically. Until the next charge window has ended, the charge price comes from the upcoming window. Configure a persistent `contextStorage` in Node-RED `settings.js` to keep them.
 
