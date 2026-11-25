@@ -156,10 +156,91 @@ Group **7 — Schedule viewer** serves a read-only page with the current plan. O
 - A bar chart of the price per hour or quarter, coloured by mode (charge / self-consume / hold), with the self-consume threshold as a dashed line, day separators and a "now" marker. Hover over a bar for its details.
 - Summary tiles (current mode, battery SoC, current price vs. threshold, next charge window, planned hours per mode and the number of GX slots used) and a table you can expand.
 - `/dess?format=json` returns the same data as JSON, including `soc: { value, at }`.
+- `/dess?format=ha` returns a compact JSON for Home Assistant, see below.
 
 The battery SoC comes from the GX (`com.victronenergy.system` → `/Dc/Battery/Soc`) via the `Battery SoC` node, which only sends changes (rounded to 0.1%). The tile therefore shows the time of the *last change*, not of the last check. After a deploy it says "waiting for the GX" until the first value arrives. If the GX reports no valid SoC (e.g. the battery monitor is offline), the tile shows "unknown since …" instead of 0%.
 
 The page shows what the `Rules planner` stored in flow context (`cheapestHourDessPlan`) on its last run, so it is at most an hour old, and it reloads every 5 minutes. It writes nothing to the GX. After a deploy it says "No plan yet" until the next run (or press `Run now (test)`). The endpoint has no login of its own; it follows `httpNodeAuth` in `settings.js`, if set.
+
+### Home Assistant (apexcharts-card)
+
+`/dess?format=ha` returns a compact version for a Home Assistant REST sensor:
+
+```json
+{ "mode": "self", "price": 0.26, "threshold": 0.23, "soc": 55.3,
+  "next_charge_start": "2026-11-26T01:00:00.000Z", "next_charge_end": "2026-11-26T04:00:00.000Z", "next_charge_price": 0.21,
+  "planned_at": "2026-11-25T18:00:00.000Z", "interval": 15, "horizon_hours": 33,
+  "periods": [[1795631400000, 0.26, 0.23, "self"], [1795632300000, 0.22, null, "charge"], ...] }
+```
+
+Each `periods` entry is `[start (ms), price, threshold or null, mode]`. `horizon_hours` is the number of whole hours from the start of the current hour to the end of the plan (about 9 in the morning, up to about 33 once tomorrow's prices are in), used as the chart span. 48 hours of quarters is about 7 KB, below Home Assistant's 16 KB limit for attributes stored in the recorder.
+
+Sensor (`configuration.yaml`; use the same address as the page):
+
+```yaml
+rest:
+  - resource: http://venus.local:1881/dess?format=ha
+    scan_interval: 300
+    sensor:
+      - name: DESS plan
+        unique_id: dess_plan
+        value_template: "{{ value_json.mode }}"
+        json_attributes: [price, threshold, soc, next_charge_start, next_charge_end, next_charge_price, planned_at, interval, horizon_hours, periods]
+```
+
+Card: price bars coloured by mode, plus the threshold. It needs [apexcharts-card](https://github.com/RomRider/apexcharts-card) and [config-template-card](https://github.com/iantrich/config-template-card) (both via HACS). apexcharts-card only takes a fixed `graph_span`, so config-template-card fills it in from `horizon_hours`; the chart then always ends where the plan ends instead of leaving the rest of a fixed span empty.
+
+```yaml
+type: custom:config-template-card
+entities:
+  - sensor.dess_plan
+card:
+  type: custom:apexcharts-card
+  header:
+    show: true
+    title: DESS plan
+  graph_span: ${states['sensor.dess_plan'].attributes.horizon_hours + 'h'}
+  span:
+    start: hour
+  now:
+    show: true
+    label: now
+  stacked: true
+  yaxis:
+    - decimals: 2
+  apex_config:
+    legend:
+      show: true
+  series:
+    - entity: sensor.dess_plan
+      name: Charge
+      type: column
+      color: "#2a78d6"
+      data_generator: |
+        return entity.attributes.periods.map(p => [p[0], p[3] === 'charge' ? p[1] : null]);
+    - entity: sensor.dess_plan
+      name: Self-consume
+      type: column
+      color: "#eb6834"
+      data_generator: |
+        return entity.attributes.periods.map(p => [p[0], p[3] === 'self' ? p[1] : null]);
+    - entity: sensor.dess_plan
+      name: Hold
+      type: column
+      color: "#1baf7a"
+      data_generator: |
+        return entity.attributes.periods.map(p => [p[0], p[3] === 'hold' ? p[1] : null]);
+    - entity: sensor.dess_plan
+      name: Threshold
+      type: line
+      curve: stepline
+      stroke_width: 2
+      color: "#8a8984"
+      data_generator: |
+        return entity.attributes.periods.map(p => [p[0], p[2]]);
+```
+
+The three mode series are stacked so each bar sits in its own time slot (only one of them has a value per period). `periods` only holds periods that have not ended, so the chart starts at the current hour.
 
 ## Troubleshooting
 
